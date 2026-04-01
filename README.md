@@ -122,7 +122,7 @@ MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source
 
 ```java
 MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source, Target>()
-        .notifyUpdate("nickname", (path, oldValue, newValue) -> {
+        .notifyUpdate("profile.nickname", (path, oldValue, newValue) -> {
             System.out.println(path + " changed: " + oldValue + " -> " + newValue);
         });
 ```
@@ -131,7 +131,7 @@ MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source
 
 ```java
 MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source, Target>()
-        .notifyUpdate(Arrays.asList("nickname", "avatar"), (source, target, fields) -> {
+        .notifyUpdate(Arrays.asList("profile.nickname", "profile.avatar"), (source, target, fields) -> {
             // fields 包含本次触发的更新字段
         });
 ```
@@ -140,7 +140,7 @@ MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source
 
 ```java
 MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source, Target>()
-        .notifyUpdateAny(Arrays.asList("nickname", "avatar"), (source, target, fields) -> {
+        .notifyUpdateAny(Arrays.asList("profile.nickname", "profile.avatar"), (source, target, fields) -> {
             // nickname 或 avatar 任一发生更新即触发
         });
 ```
@@ -169,4 +169,21 @@ MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source
 - 比较逻辑优先使用 `Comparable`，否则走 `Objects.equals`。
 - 对象合并依赖无参构造（用于需要新建目标子对象的场景）。
 
+## 运行测试
 
+```bash
+./gradlew test
+```
+
+测试覆盖了：
+
+- 基础字段合并
+- 父类字段合并
+- 嵌套对象/集合合并
+- 自定义复制器
+- 更新通知
+- 类型转换与不可变类型
+
+## 许可证
+
+当前仓库未声明许可证文件。若用于生产或分发，建议先补充 `LICENSE`。
