@@ -1,0 +1,25 @@
+apply plugin: 'java'
+
+group = 'io.github.beanmerge'
+version = '1.0.0'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'commons-beanutils:commons-beanutils:1.9.3'
+    compile 'org.slf4j:slf4j-api:1.7.25'
+
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.mockito:mockito-all:1.10.19'
+    testCompile 'io.github.dummie-java:dummie:1.0.1'
+    testCompile 'com.google.guava:guava:23.0'
+}
+
+test {
+    useJUnit()
+}

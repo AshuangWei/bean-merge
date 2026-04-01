@@ -1,0 +1,192 @@
+package io.github.beanmerge.copier.impl;
+
+import io.github.beanmerge.Merger;
+import io.github.beanmerge.copier.Copier;
+import io.github.beanmerge.exception.MergeException;
+import io.github.beanmerge.internal.PropertyPaths;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.Converter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DeepCopyCopier extends Copier {
+
+  private static final Logger LOG = LoggerFactory.getLogger(DeepCopyCopier.class);
+
+  private static final Set<Class<?>> WRAPPER_TYPES = getBasicTypes();
+
+  private static final Set<Class<?>> IMMUTABLE_TYPES = getStandardImmutableTypes();
+
+  private final Merger merger;
+
+  public DeepCopyCopier(Merger merger) {
+    this.merger = merger;
+  }
+
+  private static boolean isWrapperType(Class<?> clazz) {
+    return WRAPPER_TYPES.contains(clazz);
+  }
+
+  private static Set<Class<?>> getBasicTypes() {
+    Set<Class<?>> ret = new HashSet<>();
+    ret.add(Boolean.class);
+    ret.add(Character.class);
+    ret.add(Byte.class);
+    ret.add(Short.class);
+    ret.add(Integer.class);
+    ret.add(Long.class);
+    ret.add(Float.class);
+    ret.add(Double.class);
+    ret.add(Void.class);
+    ret.add(String.class);
+    return ret;
+  }
+
+  private static Set<Class<?>> getStandardImmutableTypes() {
+    Set<Class<?>> ret = new HashSet<>();
+    ret.add(ZonedDateTime.class);
+    ret.add(LocalDateTime.class);
+    ret.add(OffsetDateTime.class);
+    ret.add(BigDecimal.class);
+    return ret;
+  }
+
+  @Override
+  public Object copy(Field field, Object fromValue, Object toValue, String path) {
+    try {
+      return isImmutableType(field.getType()) ? normalize(field.getType(), fromValue) : getObjectValue(field, fromValue, toValue, path);
+    } catch (InstantiationException | IllegalAccessException e) {
+      LOG.error("Init field bean error: {}", e);
+      throw new MergeException(e);
+    }
+  }
+
+  private boolean isImmutableType(Class type) {
+    return type.isEnum() || type.isPrimitive() || isWrapperType(type)
+        || IMMUTABLE_TYPES.contains(type) || merger.getCustomImmutableTypes().contains(type);
+  }
+
+  private Object getObjectValue(Field field, Object fromValue, Object toValue, String path) throws IllegalAccessException, InstantiationException {
+    Object fieldBean = toValue == null ? generateInstance(fromValue, field.getType()) : toValue;
+    if (fieldBean instanceof Collection) {
+      Type[] actualTypeArguments = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+      mergeCollectionValue((Collection) fromValue, (Collection) fieldBean, (Class) actualTypeArguments[0],
+          PropertyPaths.childPath(path, field.getName()));
+    } else {
+      merger.merge(fromValue, fieldBean, PropertyPaths.childPath(path, field.getName()));
+    }
+    return fieldBean;
+  }
+
+  private void mergeCollectionValue(Collection fromValue, Collection toValue, Class type,
+      String path) throws InstantiationException, IllegalAccessException {
+    if (isImmutableType(type)) {
+      Object[] objects = toValue.toArray();
+      toValue.clear();
+      toValue.addAll(fromValue);
+      if (fromValue.size() < objects.length) {
+        for (int i = fromValue.size(); i < objects.length; i++) {
+          toValue.add(objects[i]);
+        }
+      }
+    } else {
+      int index = 0;
+      Iterator toIterator = toValue.iterator();
+      Iterator fromIterator = fromValue.iterator();
+      while (toIterator.hasNext()) {
+        index++;
+        Object to = toIterator.next();
+        if (fromIterator.hasNext()) {
+          Object from = fromIterator.next();
+          merger.merge(from, to, PropertyPaths.collectionElementPath(path,
+              toValue.getClass().isInstance(List.class) ? String.valueOf(index) : "?"));
+        }
+      }
+      while (fromIterator.hasNext()) {
+        index++;
+        Object from = fromIterator.next();
+        Object to = generateInstance(from, type);
+        toValue.add(to);
+        merger.merge(from, to, PropertyPaths.collectionElementPath(path,
+            toValue.getClass().isInstance(List.class) ? String.valueOf(index) : "?"));
+      }
+    }
+  }
+
+  private Object generateInstance(Object fromValue, Class type) throws InstantiationException, IllegalAccessException {
+    if (fromValue != null && type.isInstance(fromValue)) {
+      return fromValue.getClass().newInstance();
+    } else {
+      return type.newInstance();
+    }
+  }
+
+  /**
+   * Copy from org.apache.commons.beanutils.BeanUtilsBean.setProperty(final Object bean, String name, final Object value) to Convert the specified
+   * value to the required type
+   *
+   * @param type      target field type.
+   * @param fromValue from value, should be merge
+   * @return target type instance
+   */
+  private Object normalize(Class type, Object fromValue) {
+    if (fromValue == null || type.isInstance(fromValue)) {
+      return fromValue;
+    }
+    Object newValue;
+    if (type.isArray() && type.getComponentType().isPrimitive()) { // Scalar value into array
+      if (fromValue instanceof String) {
+        newValue = ConvertUtils.convert(fromValue, type);
+      } else if (fromValue instanceof String[]) {
+        newValue = ConvertUtils.convert((String[]) fromValue, type);
+      } else {
+        newValue = convert(fromValue, type);
+      }
+    } else if (type.isArray()) {         // Indexed value into array
+      if (fromValue instanceof String) {
+        newValue = ConvertUtils.convert((String) fromValue, type.getComponentType());
+      } else if (fromValue instanceof String[]) {
+        newValue = ConvertUtils.convert(((String[]) fromValue)[0], type.getComponentType());
+      } else {
+        newValue = convert(fromValue, type.getComponentType());
+      }
+    } else {                             // Value into scalar
+      if (fromValue instanceof String) {
+        newValue = ConvertUtils.convert((String) fromValue, type);
+      } else if (fromValue instanceof String[]) {
+        newValue = ConvertUtils.convert(((String[]) fromValue)[0], type);
+      } else {
+        newValue = convert(fromValue, type);
+      }
+    }
+    return newValue;
+  }
+
+  /**
+   * Copy from Copy from org.apache.commons.beanutils.BeanUtilsBean.convert(final Object value, final Class<?> type)
+   *
+   * @param value source value
+   * @param type  target type
+   * @return target value
+   */
+  private Object convert(final Object value, final Class<?> type) {
+    final Converter converter = ConvertUtils.lookup(type);
+    if (converter != null) {
+      return converter.convert(type, value);
+    } else {
+      return value;
+    }
+  }
+}
