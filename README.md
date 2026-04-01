@@ -1,6 +1,7 @@
 # bean-merge
 
 `bean-merge` 是一个轻量级 Java Bean 合并工具，支持把 `source` 对象的值递归合并到 `target` 对象，并返回本次合并是否发生变更。
+`bean-merge` 的实现思路来源于 [yeyuexia/merge](https://github.com/yeyuexia/merge)，并在其基础上进行了修改与功能增强。
 
 项目适用于以下场景：
 
@@ -152,3 +153,8 @@ MergeConfiguration<Source, Target> configuration = new MergeConfiguration<Source
 - 返回值 `boolean` 表示本次是否有字段值发生变化。
 - 比较逻辑优先使用 `Comparable`，否则走 `Objects.equals`。
 - 对象合并依赖无参构造（用于需要新建目标子对象的场景）。
+
+## 致谢
+
+`bean-merge` 的实现思路参考并来源于 [yeyuexia/merge](https://github.com/yeyuexia/merge)。  
+本项目在其设计基础上，结合实际业务需求做了持续修改与功能增强。
