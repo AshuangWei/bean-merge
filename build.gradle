@@ -1,6 +1,8 @@
 apply plugin: 'java'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
 
-group = 'io.github.beanmerge'
+group = 'io.github.ashuangwei'
 version = '1.0.0'
 
 sourceCompatibility = 1.8
@@ -22,4 +24,62 @@ dependencies {
 
 test {
     useJUnit()
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            pom {
+                name = 'bean-merge'
+                description = 'Lightweight Java Bean merge utility'
+                url = 'https://github.com/AshuangWei/bean-merge'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'AshuangWei'
+                        name = 'AshuangWei'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/AshuangWei/bean-merge.git'
+                    developerConnection = 'scm:git:ssh://github.com:AshuangWei/bean-merge.git'
+                    url = 'https://github.com/AshuangWei/bean-merge'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'central'
+            url = 'https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/'
+            credentials {
+                username = findProperty('mavenCentralUsername') ?: ''
+                password = findProperty('mavenCentralPassword') ?: ''
+            }
+        }
+    }
+}
+
+signing {
+    // ponytail: skip sign for local publish; require keys only when uploading to Central
+    required { gradle.taskGraph.hasTask('publish') }
+    sign publishing.publications.mavenJava
 }
