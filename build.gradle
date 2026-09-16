@@ -78,8 +78,20 @@ publishing {
     }
 }
 
+// ponytail: Gradle 4.8 drops/hides some signing* keys from ~/.gradle/gradle.properties; read file directly
+def userGradleProps = {
+    def f = new File(System.getProperty('user.home'), '.gradle/gradle.properties')
+    def p = new Properties()
+    if (f.exists()) {
+        f.withInputStream { p.load(it) }
+    }
+    return p
+}()
+ext.'signing.keyId' = userGradleProps.getProperty('signingKeyId') ?: userGradleProps.getProperty('signing.keyId')
+ext.'signing.password' = userGradleProps.getProperty('signingPassword') ?: userGradleProps.getProperty('signing.password')
+ext.'signing.secretKeyRingFile' = userGradleProps.getProperty('signingSecretKeyRingFile') ?: userGradleProps.getProperty('signing.secretKeyRingFile')
+
 signing {
-    // ponytail: skip sign for local publish; require keys only when uploading to Central
-    required { gradle.taskGraph.hasTask('publish') }
+    required { project.ext.'signing.keyId' }
     sign publishing.publications.mavenJava
 }

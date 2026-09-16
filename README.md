@@ -27,6 +27,18 @@
 - JDK 8+
 - Gradle（项目已包含 `gradlew`）
 
+```gradle
+compile 'io.github.ashuangwei:bean-merge:1.0.0'
+```
+
+```xml
+<dependency>
+  <groupId>io.github.ashuangwei</groupId>
+  <artifactId>bean-merge</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
+
 ## 快速开始
 
 ### 1) 默认合并（忽略 null）
